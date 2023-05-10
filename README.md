@@ -6,3 +6,4 @@ Monkey has a C-like syntax, supports variable bindings, prefix and infix operato
 ## Implementation Notes
 ### *Writing an Interpreter In Go*
 * Macro support from [*The Lost Chapter: A Macro System For Monkey*](https://interpreterbook.com/lost) is implemented
+* Source file execution is supported in the form e.g. `go run main.go ./hello_world.mnk`; if no arguments are passed then the REPL is invoked.
