@@ -24,8 +24,14 @@ func Start(in io.Reader, out io.Writer, noVM bool) {
 	fmt.Printf("Feel free to type in commands\n")
 
 	scanner := bufio.NewScanner(in)
+
+	// Global states, not sure how to do this in a conditional
 	env := object.NewEnvironment()
 	macroEnv := object.NewEnvironment()
+
+	constants := []object.Object{}
+	globals := make([]object.Object, vm.GlobalsSize)
+	symbolTable := compiler.NewSymbolTable()
 
 	for {
 		fmt.Fprint(out, PROMPT)
@@ -54,14 +60,16 @@ func Start(in io.Reader, out io.Writer, noVM bool) {
 				io.WriteString(out, "\n")
 			}
 		} else {
-			comp := compiler.New()
+			comp := compiler.NewWithState(symbolTable, constants)
 			err := comp.Compile(program)
 			if err != nil {
 				fmt.Fprintf(out, "Compilation failed:\n %s\n", err)
 				continue
 			}
 
-			machine := vm.New(comp.Bytecode())
+			code := comp.Bytecode()
+			constants = code.Constants
+			machine := vm.NewWithGlobalsStore(code, globals)
 			err = machine.Run()
 			if err != nil {
 				fmt.Fprintf(out, "Executing bytecode failed:\n %s\n", err)
