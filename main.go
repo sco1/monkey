@@ -1,42 +1,41 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
+	"monkey/compiler"
 	"monkey/evaluator"
 	"monkey/lexer"
 	"monkey/object"
 	"monkey/parser"
 	"monkey/repl"
+	"monkey/vm"
 	"os"
-	"os/user"
 )
 
 func main() {
-	switch len(os.Args) {
+	var noVM bool
+	flag.BoolVar(&noVM, "no-vm", false, "Execute using the interpreter path only")
+	flag.Parse()
+
+	switch len(flag.Args()) {
+	case 0:
+		repl.Start(os.Stdin, os.Stdout, noVM)
 	case 1:
-		user, err := user.Current()
+		filePath := flag.Args()[0]
+		src, err := os.ReadFile(filePath)
 		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("Hello %s! This is the Monkey programming language!\n", user.Username)
-		fmt.Printf("Feel free to type in commands\n")
-		repl.Start(os.Stdin, os.Stdout)
-	case 2:
-		src, err := os.ReadFile(os.Args[1])
-		if err != nil {
-			msg := fmt.Sprintf("Could not parse file: %s", os.Args[1])
+			msg := fmt.Sprintf("Could not parse file: %s", filePath)
 			panic(msg)
 		}
-
-		runSource(src, os.Stdout)
-
+		runSource(src, os.Stdout, noVM)
 	default:
-		fmt.Printf("Only one argument is supported. Got: %d", len(os.Args)-1)
+		fmt.Printf("Only one filepath is supported. Got: %d", len(flag.Args()))
 	}
 }
 
-func runSource(src []byte, out io.Writer) {
+func runSource(src []byte, out io.Writer, noVM bool) {
 	l := lexer.New(string(src))
 	p := parser.New(l)
 
@@ -46,15 +45,33 @@ func runSource(src []byte, out io.Writer) {
 		os.Exit(1)
 	}
 
-	env := object.NewEnvironment()
-	macroEnv := object.NewEnvironment()
+	if noVM {
+		env := object.NewEnvironment()
+		macroEnv := object.NewEnvironment()
 
-	evaluator.DefineMacros(program, macroEnv)
-	expanded := evaluator.ExpandMacros(program, macroEnv)
+		evaluator.DefineMacros(program, macroEnv)
+		expanded := evaluator.ExpandMacros(program, macroEnv)
 
-	evaluated := evaluator.Eval(expanded, env)
-	if evaluated != nil {
-		io.WriteString(out, evaluated.Inspect())
+		evaluated := evaluator.Eval(expanded, env)
+		if evaluated != nil {
+			io.WriteString(out, evaluated.Inspect())
+		}
+	} else {
+		comp := compiler.New()
+		err := comp.Compile(program)
+		if err != nil {
+			fmt.Fprintf(out, "Compilation failed:\n %s\n", err)
+		}
+
+		machine := vm.New(comp.Bytecode())
+		err = machine.Run()
+		if err != nil {
+			fmt.Fprintf(out, "Executing bytecode failed:\n %s\n", err)
+		}
+
+		stackTop := machine.StackTop()
+		io.WriteString(out, stackTop.Inspect())
+		io.WriteString(out, "\n")
 	}
 }
 

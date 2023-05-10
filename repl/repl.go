@@ -5,15 +5,27 @@ import (
 	"fmt"
 	"io"
 	"monkey/compiler"
+	"monkey/evaluator"
 	"monkey/lexer"
+	"monkey/object"
 	"monkey/parser"
 	"monkey/vm"
 )
 
 const PROMPT = ">> "
 
-func Start(in io.Reader, out io.Writer) {
+func Start(in io.Reader, out io.Writer, noVM bool) {
+	fmt.Printf("Welcome to the Monkey programming language! ")
+	if noVM {
+		fmt.Printf("(Interpreter Mode)\n")
+	} else {
+		fmt.Printf("(VM Mode)\n")
+	}
+	fmt.Printf("Feel free to type in commands\n")
+
 	scanner := bufio.NewScanner(in)
+	env := object.NewEnvironment()
+	macroEnv := object.NewEnvironment()
 
 	for {
 		fmt.Fprint(out, PROMPT)
@@ -32,23 +44,34 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		comp := compiler.New()
-		err := comp.Compile(program)
-		if err != nil {
-			fmt.Fprintf(out, "Compilation failed:\n %s\n", err)
-			continue
-		}
+		if noVM {
+			evaluator.DefineMacros(program, macroEnv)
+			expanded := evaluator.ExpandMacros(program, macroEnv)
 
-		machine := vm.New(comp.Bytecode())
-		err = machine.Run()
-		if err != nil {
-			fmt.Fprintf(out, "Executing bytecode failed:\n %s\n", err)
-			continue
-		}
+			evaluated := evaluator.Eval(expanded, env)
+			if evaluated != nil {
+				io.WriteString(out, evaluated.Inspect())
+				io.WriteString(out, "\n")
+			}
+		} else {
+			comp := compiler.New()
+			err := comp.Compile(program)
+			if err != nil {
+				fmt.Fprintf(out, "Compilation failed:\n %s\n", err)
+				continue
+			}
 
-		stackTop := machine.StackTop()
-		io.WriteString(out, stackTop.Inspect())
-		io.WriteString(out, "\n")
+			machine := vm.New(comp.Bytecode())
+			err = machine.Run()
+			if err != nil {
+				fmt.Fprintf(out, "Executing bytecode failed:\n %s\n", err)
+				continue
+			}
+
+			stackTop := machine.StackTop()
+			io.WriteString(out, stackTop.Inspect())
+			io.WriteString(out, "\n")
+		}
 	}
 }
 
