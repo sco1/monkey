@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"monkey/ast"
+	"monkey/code"
 	"strings"
 )
 
@@ -24,6 +25,8 @@ const (
 	HASH_OBJ         = "HASH"
 	QUOTE_OBJ        = "QUOTE"
 	MACRO_OBJ        = "MACRO"
+
+	COMPILED_FUNCTION_OBJ = "COMPILED_FUNCTION_OBJ"
 )
 
 type Object interface {
@@ -211,3 +214,10 @@ func (m *Macro) Inspect() string {
 
 	return out.String()
 }
+
+type CompiledFunction struct {
+	Instructions code.Instructions
+}
+
+func (cf *CompiledFunction) Type() ObjectType { return COMPILED_FUNCTION_OBJ }
+func (cf *CompiledFunction) Inspect() string  { return fmt.Sprintf("compiledFunction[%p]", cf) }
